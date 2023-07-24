@@ -51,3 +51,37 @@ class GroupbyImputer(BaseEstimator, TransformerMixin):
     elif aggfunc == 'max':
       return pd.DataFrame.max
     else: return pd.DataFrame.median
+
+class FfillImputer(BaseEstimator, TransformerMixin):
+  def __init__(self, column_to_fill, orderby_column=None, strategy='ffill'):
+    self.column_to_fill = column_to_fill        
+    self.orderby_column = orderby_column
+    self.strategy = strategy
+
+  def fit(self, X, y=None):
+    if not self.orderby_column:
+      # try to find col with dates
+      try:
+        self.orderby_column = X.select_dtypes(include='datetime').iloc[:,0].name
+      except:
+        pass
+    
+    if not self.orderby_column:
+      # sort by index
+      self.sorted_df = X.sort_index()
+    else:
+      self.sorted_df = X.sort_values(by=self.orderby_column)
+    return self
+
+
+  def transform(self, X, y=None):
+    new_df = self.sorted_df.copy()
+    if self.strategy == 'ffill':
+      new_df[self.column_to_fill] = new_df[self.column_to_fill].ffill()
+    elif self.strategy == 'bfill':
+      new_df[self.column_to_fill] = new_df[self.column_to_fill].bfill()
+    elif self.strategy == 'both_ways':
+      new_df[self.column_to_fill] = new_df[self.column_to_fill].ffill()
+      new_df[self.column_to_fill] = new_df[self.column_to_fill].bfill()
+    new_df = new_df.reindex(X.index)
+    return new_df
