@@ -12,6 +12,12 @@ class GroupbyImputer(BaseEstimator, TransformerMixin):
 
   
   def fit(self, X, y=None):
+    """fit method creates groups and group medians attributes within class instance.
+    If dtype is numeric and there're more unique values than number of groups required,
+    the range is cut into given number of groups with equal intervals (default number of groups is 4).
+    If groupby column is categorical or there are not many numeric values in it, every unique value makes up a group.
+    Median value in the column to fill for every group is calculated
+    """
     # for numeric
     if (pd.api.types.is_numeric_dtype(X[self.groupby_column])) and (X[self.groupby_column].nunique() > self.num_groups):      
       X['groups'] = pd.cut(X[self.groupby_column], self.num_groups)
@@ -28,6 +34,10 @@ class GroupbyImputer(BaseEstimator, TransformerMixin):
     return self
 
   def transform(self, X, y=None):
+    """transform method iterates over groups defined within fit method.
+    if the row belongs to a given group and the value in column to fill is missing, it's filled with the pre-calculated median.
+    afterwards all groups are concatenated and the result reindxed to match the original dataframe
+    """
     new_dfs = []
     for i in range(len(self.groups)):
       # for numeric
@@ -44,6 +54,9 @@ class GroupbyImputer(BaseEstimator, TransformerMixin):
     return new_df
 
   def agg(aggfunc):
+    """choice of aggregation function from user input.
+    median by default
+    """
     if aggfunc == 'mean':
       return pd.DataFrame.mean
     elif aggfunc == 'min':
@@ -59,6 +72,10 @@ class FfillImputer(BaseEstimator, TransformerMixin):
     self.strategy = strategy
 
   def fit(self, X, y=None):
+    """fit method tries to find a datetime column to sort the dataframe by values in that column.
+    if there's none, index is used to order by.
+    returns self with attribute of sorted dataframe added
+    """
     if not self.orderby_column:
       # try to find col with dates
       try:
@@ -75,6 +92,9 @@ class FfillImputer(BaseEstimator, TransformerMixin):
 
 
   def transform(self, X, y=None):
+    """transform method simply implements pandas.ffill or pandas.bfill or both consequently on the previously sorted dataframe.
+    afterwards the result is reindxed to match the original dataframe
+    """
     new_df = self.sorted_df.copy()
     if self.strategy == 'ffill':
       new_df[self.column_to_fill] = new_df[self.column_to_fill].ffill()
