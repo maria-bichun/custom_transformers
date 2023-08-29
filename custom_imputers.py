@@ -30,7 +30,14 @@ class GroupbyImputer(BaseEstimator, TransformerMixin):
       self.groups = X[self.groupby_column].unique()
       self.medians = []
       for group in self.groups:
-        self.medians.append(X[X[self.groupby_column] == group][self.column_to_fill].agg(self.aggfunc))
+        median = X[X[self.groupby_column] == group][self.column_to_fill].agg(self.aggfunc)
+          if self.aggfunc == 'mode':
+            try:
+              self.medians.append(median[0])
+            except:
+              self.medians.append('no_value')
+          else:
+            self.medians.append(median)
     return self
 
   def transform(self, X, y=None):
@@ -38,6 +45,9 @@ class GroupbyImputer(BaseEstimator, TransformerMixin):
     if the row belongs to a given group and the value in column to fill is missing, it's filled with the pre-calculated median.
     afterwards all groups are concatenated and the result reindxed to match the original dataframe
     """
+    # this is to catch the problem when we use imputer trained on train df to fill na in test df and the latter contains categories that are not in train
+    cannot_fill_df = X[~X[self.groupby_column].isin(self.groups)]    
+
     new_dfs = []
     for i in range(len(self.groups)):
       # for numeric
@@ -47,9 +57,11 @@ class GroupbyImputer(BaseEstimator, TransformerMixin):
       # for categorial  
       else:
         group_df = X[X[self.groupby_column] == self.groups[i]].copy()
-
+        
       group_df[self.column_to_fill] = group_df[self.column_to_fill].fillna(self.medians[i])
       new_dfs.append(group_df)
+    
+    new_dfs.append(cannot_fill_df)
     new_df = pd.concat(new_dfs).reindex(X.index)  
     return new_df
 
@@ -63,6 +75,8 @@ class GroupbyImputer(BaseEstimator, TransformerMixin):
       return pd.DataFrame.min
     elif aggfunc == 'max':
       return pd.DataFrame.max
+    elif aggfunc == 'mode':
+      return pd.DataFrame.mode()[0]
     else: return pd.DataFrame.median
 
 class FfillImputer(BaseEstimator, TransformerMixin):
